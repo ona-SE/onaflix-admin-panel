@@ -1,0 +1,40 @@
+services:
+  postgres:
+    name: PostgreSQL
+    description: Run PostgreSQL database in a Docker container.
+    commands:
+      start: |
+        docker rm -f onaflix-postgres 2>/dev/null || true
+        docker run --rm \
+          --name onaflix-postgres \
+          -e POSTGRES_USER=gitpod \
+          -e POSTGRES_PASSWORD=gitpod \
+          -e POSTGRES_DB=onaflix_admin \
+          -p 5432:5432 \
+          postgres:16
+      ready: |
+        docker exec onaflix-postgres pg_isready -U gitpod
+      stop: |
+        docker rm -f onaflix-postgres
+    triggeredBy:
+      - postDevcontainerStart
+
+  flask-dev:
+    name: Flask Dev Server
+    description: Run the Flask development server on port 5000.
+    commands:
+      start: |
+        python run.py
+      ready: |
+        curl -f http://localhost:5000/health
+    triggeredBy:
+      - postDevcontainerStart
+
+tasks:
+  install-deps:
+    name: Install dependencies
+    description: Install Python dependencies from requirements.txt.
+    command: |
+      pip install -r requirements.txt
+    triggeredBy:
+      - postDevcontainerStart
