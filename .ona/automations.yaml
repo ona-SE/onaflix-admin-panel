@@ -1,0 +1,49 @@
+tasks:
+  install-deps:
+    name: Install dependencies
+    description: Install Python dependencies from requirements.txt.
+    command: |
+      pip install -r requirements.txt
+    triggeredBy:
+      - postDevcontainerStart
+
+  start-db:
+    name: Start PostgreSQL
+    description: Start a PostgreSQL container for local development.
+    command: |
+      docker rm -f onaflix-postgres 2>/dev/null || true
+      docker run -d \
+        --name onaflix-postgres \
+        -e POSTGRES_USER=gitpod \
+        -e POSTGRES_PASSWORD=gitpod \
+        -e POSTGRES_DB=onaflix_admin \
+        -p 5432:5432 \
+        postgres:16
+      until docker exec onaflix-postgres pg_isready -U gitpod; do
+        echo "Waiting for PostgreSQL..."
+        sleep 1
+      done
+      echo "PostgreSQL is ready."
+    triggeredBy:
+      - postDevcontainerStart
+
+  init-db:
+    name: Initialize database
+    description: Create database tables from SQLAlchemy models.
+    command: |
+      python -c "from app import create_app, db; app = create_app(); app.app_context().push(); db.create_all(); print('Database tables created.')"
+    triggeredBy:
+      - postDevcontainerStart
+    dependsOn:
+      - install-deps
+      - start-db
+
+services:
+  flask-dev:
+    name: Flask Dev Server
+    description: Run the Flask development server on port 5000.
+    commands:
+      start: |
+        python run.py
+      ready: |
+        curl -sf http://localhost:5000/health
