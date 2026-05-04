@@ -1,0 +1,48 @@
+services:
+  flask-app:
+    name: Flask App
+    description: OnaFlix Admin Panel (Flask dev server on port 5000)
+    triggeredBy:
+      - postDevcontainerStart
+    commands:
+      start: python run.py
+      ready: curl -s -o /dev/null -w '%{http_code}' http://localhost:5000/health | grep -q 200
+
+  postgresql:
+    name: PostgreSQL
+    description: PostgreSQL database server
+    triggeredBy:
+      - postDevcontainerStart
+    commands:
+      start: sudo service postgresql start && sleep infinity
+      ready: pg_isready -h localhost -p 5432
+
+tasks:
+  install-deps:
+    name: Install Dependencies
+    description: Install Python dependencies from requirements.txt
+    triggeredBy:
+      - postDevcontainerStart
+    commands:
+      start: pip install -r requirements.txt
+
+  init-db:
+    name: Initialize Database
+    description: Create database tables
+    triggeredBy:
+      - postDevcontainerStart
+    depends-on:
+      - postgresql
+      - install-deps
+    commands:
+      start: python -c "from app import create_app, db; app = create_app(); app.app_context().push(); db.create_all(); print('Database tables created')"
+
+  run-tests:
+    name: Run Tests
+    description: Run pytest suite
+    triggeredBy:
+      - manual
+    depends-on:
+      - install-deps
+    commands:
+      start: pytest -v
