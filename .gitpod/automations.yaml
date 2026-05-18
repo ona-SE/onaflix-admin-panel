@@ -1,0 +1,44 @@
+services:
+  flask-app:
+    name: Flask App
+    description: OnaFlix admin panel Flask development server
+    triggeredBy:
+      - postDevcontainerStart
+    commands:
+      start: python run.py
+      ready: curl -s -o /dev/null -w '%{http_code}' http://localhost:5000/health | grep -q 200
+
+  postgresql:
+    name: PostgreSQL
+    description: PostgreSQL database server
+    triggeredBy:
+      - postDevcontainerStart
+    commands:
+      start: sudo pg_ctlcluster 15 main start && tail -f /var/log/postgresql/postgresql-15-main.log
+      ready: pg_isready -h localhost -p 5432
+
+tasks:
+  install-deps:
+    name: Install Dependencies
+    description: Install Python dependencies from requirements.txt
+    triggeredBy:
+      - postDevcontainerStart
+    command: pip install --no-cache-dir -r requirements.txt
+
+  init-db:
+    name: Initialize Database
+    description: Create database user, database, and run schema setup
+    triggeredBy:
+      - postDevcontainerStart
+    depends-on:
+      - postgresql
+      - install-deps
+    command: |
+      sudo -u postgres psql -c "CREATE USER gitpod WITH PASSWORD 'gitpod' CREATEDB;" 2>/dev/null || true
+      sudo -u postgres createdb -O gitpod onaflix_admin 2>/dev/null || true
+      python -c "from app import create_app, db; app = create_app(); app.app_context().push(); db.create_all(); print('Database tables created.')"
+
+  run-tests:
+    name: Run Tests
+    description: Run pytest suite
+    command: python -m pytest tests/ -v
