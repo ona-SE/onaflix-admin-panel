@@ -1,0 +1,28 @@
+services:
+  flask-app:
+    name: Flask App
+    description: OnaFlix admin panel (Flask dev server)
+    triggeredBy:
+      - postDevcontainerStart
+    commands:
+      start: python run.py
+      ready: curl -s -o /dev/null -w '%{http_code}' http://localhost:5000/health | grep -q 200
+    dependsOn:
+      - install-deps
+      - init-db
+
+tasks:
+  install-deps:
+    name: Install Dependencies
+    description: Install Python dependencies from requirements.txt
+    triggeredBy:
+      - postDevcontainerStart
+    command: pip install --no-cache-dir -r requirements.txt
+  init-db:
+    name: Initialize Database
+    description: Create database tables via Flask-SQLAlchemy
+    triggeredBy:
+      - postDevcontainerStart
+    command: python -c "from app import create_app, db; app = create_app(); app.app_context().push(); db.create_all(); print('Database tables created')"
+    dependsOn:
+      - install-deps
